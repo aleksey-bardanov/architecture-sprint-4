@@ -14,46 +14,60 @@ Person_Ext(api_user, "B2B клиент", "Засчитывает стоимос�
 Person(operator, "Оператор", "Берет заказы в работу")
 
 System_Boundary(jewerly_store, "Система обработки заказов магазина Александрит") {
-    System_Boundary(mes, "Система управления производством") {
-        Container(mes_fe, "Система управления производством. Web приложение.", "Typescript, React", "Предоставляет интерфейс для операторов и список заказов")
-        Container(mes_be, "Система управления производством. Сервис.", "java, SpringBoot", "Калькуляция цены, список заказов, передача заказов операторам")
-        ContainerDb(mes_db, "Devices Control Database", "PostgreSQL", "Хранит информацию о заказах, взятых в работу, о том какие операторы какие заказы выполняют")
+    System_Boundary(mes, "MES") {
+        Container(mes_fe, "MES. Web приложение.", "Typescript, React", "Предоставляет интерфейс для операторов и список заказов")
+        Container(mes_be_manufactory, "MES Сервис", "C#, .NET", "Список заказов, передача заказов операторам")
+        Container(mes_cache, "MES Cache", "Raddis", "Read through, Write through")
+        ContainerDb(mes_db, "Devices Control Database", "PostgreSQL", "Заказ, оператор, статус")
     }
 
     Container(3d_files_storage, "Система хранения 3D моделей", "java, SpringBoot", "Хранит 3D модели")
 
-    System_Boundary(sensors, "Система управления заказами") {
-        Container(crm_fe, "Система управления заказами. Web приложение", "Vue, TypeScript", "Web интерфейс для продавцов")
-        Container(crm_be, "Система управления заказами. Сервис", "Java, Spring Boot", "Работа с заказами, отслеживание их статусов")
+    System_Boundary(crm, "CRM") {
+        Container(crm_fe, "CRM Web приложение", "Vue, TypeScript", "Web интерфейс для продавцов")
+        Container(api_gateway, "API Gateway", "Kong", "Перенаправляет запросы  B2B клиентов")
+        Container(crm_be, "CRM Сервис", "Java, Spring Boot", "Работа с заказами, отслеживание их статусов")
+        ContainerDb(crm_db, "База данных CRM", "PostgreSQL", "Заказ, менеджер, клиент, модель, стоимость, статус")
+    }
+
+    System_Boundary(price_calculator, "Price Calculator") {
+        Container(mes_be_price, "MES Сервис", "C#, .NET", "Только расчет стоимости")
     }
     
     System_Boundary(shop, "Интернет магазин") {
         Container(shop_fe, "Интернет магазин. Web приложение.", "Vue, TypeScript, Threejs", "Оформление заказов, загрузка 3D моделей, 3D редактор")
         Container(shop_be, "Интернет магазин. Сервис.", "java, SpringBoot", "Личный кабинет пользователя, сохранение 3D моделей, список покупок")
-        ContainerDb(shop_db, "База данный интернет магазина", "PostgreSQL", "Хранит информацию о покупателях и их заказах")
+        ContainerDb(shop_db, "База данный интернет магазина", "PostgreSQL", "Клиент, заказ, модель, стоимость")
     }
     
-    SystemQueue(message_brocker, "Брокер сообщений", "RabbitMQ", "Уведомляет подписчиков о новых заказах и об изменении статуса текущих")
+    SystemQueue(message_brocker, "Брокер сообщений", "RabbitMQ")
 }
 
-Rel(customer, shop_fe, "UI")
-Rel(seller, crm_fe, "UI")
-Rel(api_user, mes_be, "REST")
-Rel(operator, mes_fe, "UI")
+Rel(customer, shop_fe, "Использует", "UI")
+Rel(seller, crm_fe, "Использует", "UI")
+Rel(api_user, api_gateway, "Использует", "REST")
+Rel(operator, mes_fe, "Использует", "UI")
 
 Rel(shop_fe, shop_be, "REST")
 Rel(crm_fe, crm_be, "REST")
-Rel(mes_fe, mes_be, "REST")
+Rel(api_gateway, crm_be, "REST")
+Rel(mes_fe, mes_be_manufactory, "REST")
 
 Rel(shop_be, shop_db, "чтение/запись")
-Rel(crm_be, shop_db, "чтение/запись")
-Rel(mes_be, mes_db, "чтение/запись")
+Rel(crm_be, crm_db, "чтение/запись")
+Rel(mes_be_manufactory, mes_cache, "запись")
+Rel(mes_cache, mes_be_manufactory, "чтение")
+Rel(mes_cache, mes_db, "запись")
+Rel(mes_db, mes_cache, "чтение")
 
 Rel(shop_be, 3d_files_storage, "запись", $tags="3d_models")
 Rel(crm_be, 3d_files_storage, "чтение", $tags="3d_models")
-Rel(mes_be, 3d_files_storage, "чтение", $tags="3d_models")
+Rel(mes_be_manufactory, 3d_files_storage, "чтение", $tags="3d_models")
+Rel(mes_be_price, 3d_files_storage, "чтение", $tags="3d_models")
 
+Rel(shop_be, message_brocker, "статус заказа", $tags="brocker_message")
 Rel(crm_be, message_brocker, "статус заказа", $tags="brocker_message")
-Rel(mes_be, message_brocker, "статус заказа", $tags="brocker_message")
+Rel(mes_be_manufactory, message_brocker, "статус заказа", $tags="brocker_message")
+Rel(mes_be_price, message_brocker, "стоимость заказа", $tags="brocker_message")
 
 @enduml

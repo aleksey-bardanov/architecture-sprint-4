@@ -1,0 +1,31 @@
+@startuml
+queue RabbitMQ as Queue
+
+participant MES
+participant Cache
+participant DB
+
+note over Queue, DB : Запись производится синхронно, чтобы гарантировать передачу заказа в производство
+note over Queue, DB : Обновление статусов заказов операторами происходит аналогично 
+
+Queue -> MES : order <id> manufacturing approved
+activate MES
+
+MES -> Cache : create new order
+activate Cache
+
+Cache -> DB : create new order
+activate DB
+
+DB -> Cache : order created
+deactivate DB
+
+Cache -> Cache : Update self data
+
+Cache -> MES : order created
+deactivate Cache
+
+MES -> Queue : order <id> waiting for manufactoring
+deactivate MES
+ 
+@enduml
