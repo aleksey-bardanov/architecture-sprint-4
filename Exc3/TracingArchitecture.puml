@@ -6,6 +6,9 @@ title Текущая архитектура проекта "Александри
 AddRelTag("brocker_message", $lineStyle = DashedLine())
 AddRelTag("3d_models", $lineColor = "Orange")
 
+AddElementTag("jaeger", $fontColor="#F92727", $bgColor="#BCFBFF")
+AddRelTag("tracing", $lineStyle = DashedLine(), $lineColor = "red")
+
 LAYOUT_WITH_LEGEND()
 
 Person_Ext(customer, "Покупатель", "Заказывает изделие для себя")
@@ -15,14 +18,14 @@ Person(operator, "Оператор", "Берет заказы в работу")
 
 System_Boundary(jewerly_store, "Система обработки заказов магазина Александрит") {
     System_Boundary(mes, "MES") {
-        Container(mes_fe, "MES Web UI", "Typescript, React", "Предоставляет интерфейс для операторов и список заказов")
-        Container(mes_be, "MES Сервис.", "C#, .NET", "Калькуляция цены, список заказов, передача заказов операторам")
+        Container(mes_fe, "MES Web приложение.", "Typescript, React", "Предоставляет интерфейс для операторов и список заказов")
+        Container(mes_be, "MES Сервис", "C#, .NET", "Калькуляция цены, список заказов, передача заказов операторам")
         ContainerDb(mes_db, "MES База Данных", "PostgreSQL", "Хранит информацию о заказах, взятых в работу, о том какие операторы какие заказы выполняют")
     }
 
     Container(3d_files_storage, "Система хранения 3D моделей", "java, SpringBoot", "Хранит 3D модели")
 
-    System_Boundary(crm, "CRM") {
+    System_Boundary(sensors, "CRM") {
         Container(crm_fe, "CRM Web UI", "Vue, TypeScript", "Web интерфейс для продавцов")
         Container(crm_be, "CRM Сервис", "Java, Spring Boot", "Работа с заказами, отслеживание их статусов")
     }
@@ -34,9 +37,13 @@ System_Boundary(jewerly_store, "Система обработки заказов
     }
     
     SystemQueue(message_brocker, "Брокер сообщений", "RabbitMQ", "Уведомляет подписчиков о новых заказах и об изменении статуса текущих")
+
+    Container(jaeger_collector, "Jaeger Collector", "", "Принимает трассировочные данные от агентов, объединяет их и сохраняет в хранилище данных", $tags="jaeger")
+    ContainerDb(jaeger_db, "Jaeger Storage", "Kafka", "Данные для долгосрочного хранения и анализа", $tags="jaeger")
+    Container(jaeger_ui, "Jaeger Query Service", "", "Интерфейс и API для выполнения запросов и анализа", $tags="jaeger")
 }
 
-Rel(customer, shop_fe,  "Использует", "UI")
+Rel(customer, shop_fe, "Использует", "UI")
 Rel(seller, crm_fe, "Использует", "UI")
 Rel(api_user, mes_be, "Использует", "REST")
 Rel(operator, mes_fe, "Использует", "UI")
@@ -55,5 +62,11 @@ Rel(mes_be, 3d_files_storage, "чтение", $tags="3d_models")
 
 Rel(crm_be, message_brocker, "статус заказа", $tags="brocker_message")
 Rel(mes_be, message_brocker, "статус заказа", $tags="brocker_message")
+
+Rel_Down(jaeger_ui, jaeger_db, "", $tags="tracing")
+Rel_Down(jaeger_db, jaeger_collector, "", $tags="tracing")
+Rel_Down(mes_be, jaeger_collector, "", $tags="tracing")
+Rel_Down(crm_be, jaeger_collector, "", $tags="tracing")
+Rel_Down(shop_be, jaeger_collector, "", $tags="tracing")
 
 @enduml
