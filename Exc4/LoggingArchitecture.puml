@@ -1,0 +1,72 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Текущая архитектура проекта "Александрит"
+
+AddRelTag("brocker_message", $lineStyle = DashedLine())
+AddRelTag("3d_models", $lineColor = "Orange")
+
+AddElementTag("elk", $fontColor="#F92727", $bgColor="#BCFBFF")
+AddRelTag("logs", $lineStyle = DashedLine(), $lineColor = "red")
+
+LAYOUT_WITH_LEGEND()
+
+Person_Ext(customer, "Покупатель", "Заказывает изделие для себя")
+Person(seller, "Продавец", "Обрабатывает заказ покупателя, подтверждает заказчику, что заказ изготавливается")
+Person_Ext(api_user, "B2B клиент", "Засчитывает стоимость заказа, размещает его через внешний API")
+Person(operator, "Оператор", "Берет заказы в работу")
+
+System_Boundary(jewerly_store, "Система обработки заказов магазина Александрит") {
+    System_Boundary(mes, "MES") {
+        Container(mes_fe, "MES Web приложение.", "Typescript, React", "Предоставляет интерфейс для операторов и список заказов")
+        Container(mes_be, "MES Сервис", "C#, .NET", "Калькуляция цены, список заказов, передача заказов операторам")
+        ContainerDb(mes_db, "MES База Данных", "PostgreSQL", "Хранит информацию о заказах, взятых в работу, о том какие операторы какие заказы выполняют")
+    }
+
+    Container(3d_files_storage, "Система хранения 3D моделей", "java, SpringBoot", "Хранит 3D модели")
+
+    System_Boundary(sensors, "CRM") {
+        Container(crm_fe, "CRM Web UI", "Vue, TypeScript", "Web интерфейс для продавцов")
+        Container(crm_be, "CRM Сервис", "Java, Spring Boot", "Работа с заказами, отслеживание их статусов")
+    }
+    
+    System_Boundary(shop, "Интернет магазин") {
+        Container(shop_fe, "Интернет магазин Web UI", "Vue, TypeScript, Threejs", "Оформление заказов, загрузка 3D моделей, 3D редактор")
+        Container(shop_be, "Интернет магазин Сервис", "java, SpringBoot", "Личный кабинет пользователя, сохранение 3D моделей, список покупок")
+        ContainerDb(shop_db, "База данный интернет магазина", "PostgreSQL", "Хранит информацию о покупателях и их заказах")
+    }
+    
+    SystemQueue(message_brocker, "Брокер сообщений", "RabbitMQ", "Уведомляет подписчиков о новых заказах и об изменении статуса текущих")
+
+    ContainerDb(elasticsearch, "Elasticsearch", "", "Хранит и ищет данные", $tags="elk")
+    Container(logstash, "Logstash", "", "Фильтрует логи, складывает их в нужный индекс Elasticsearch", $tags="elk")
+    Container(kibana, "Kibana", "", "Интерфейс для просмотра и анализа логов", $tags="elk")
+}
+
+Rel(customer, shop_fe, "Использует", "UI")
+Rel(seller, crm_fe, "Использует", "UI")
+Rel(api_user, mes_be, "Использует", "REST")
+Rel(operator, mes_fe, "Использует", "UI")
+
+Rel(shop_fe, shop_be, "REST")
+Rel(crm_fe, crm_be, "REST")
+Rel(mes_fe, mes_be, "REST")
+
+Rel(shop_be, shop_db, "чтение/запись")
+Rel(crm_be, shop_db, "чтение/запись")
+Rel(mes_be, mes_db, "чтение/запись")
+
+Rel(shop_be, 3d_files_storage, "запись", $tags="3d_models")
+Rel(crm_be, 3d_files_storage, "чтение", $tags="3d_models")
+Rel(mes_be, 3d_files_storage, "чтение", $tags="3d_models")
+
+Rel(crm_be, message_brocker, "статус заказа", $tags="brocker_message")
+Rel(mes_be, message_brocker, "статус заказа", $tags="brocker_message")
+
+Rel_Down(kibana, elasticsearch, "", $tags="logs")
+Rel_Down(elasticsearch, logstash, "", $tags="logs")
+Rel_Down(mes_be, logstash, "Beat", $tags="logs")
+Rel_Down(crm_be, logstash, "Beat", $tags="logs")
+Rel_Down(shop_be, logstash, "Beat", $tags="logs")
+
+@enduml
