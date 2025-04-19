@@ -1,0 +1,36 @@
+@startuml
+actor Operator
+
+participant MES
+participant Cache
+participant DB
+
+Operator -> MES : order <id> status request
+activate MES
+
+MES -> Cache : seek order <id>
+activate Cache
+
+alt cache hit
+
+Cache -> MES : order <id> status
+
+else cache miss
+
+Cache -> DB : order <id> status
+activate DB
+
+DB -> Cache : order <id> status
+deactivate DB
+
+Cache -> Cache : Update self data
+
+Cache -> MES : order <id> status
+deactivate Cache
+
+end
+
+MES -> Operator : order <id> status
+deactivate MES
+ 
+@enduml
